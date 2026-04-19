@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes — no auth required
-  const publicPaths = ['/login', '/register', '/forgot-password', '/pay', '/api/create-order', '/api/check-order-status', '/api/auth', '/api/cron'];
+  const publicPaths = ['/login', '/register', '/forgot-password', '/pay', '/api/create-order', '/api/check-order-status', '/api/payment', '/api/auth', '/api/cron'];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
   // Static assets
