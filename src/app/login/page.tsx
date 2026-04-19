@@ -1,15 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [remember, setRemember] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,15 +18,13 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile, password }),
-        credentials: 'same-origin',
       });
 
       const data = await res.json();
-      if (data.success && data.token) {
-        // Set cookie directly via document.cookie — most reliable method
-        const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
-        document.cookie = `wepay_token=${data.token}; path=/; expires=${expires}; SameSite=Lax`;
-        // Full page navigation to dashboard
+      if (data.success) {
+        // Full page navigation — the Set-Cookie header from the API response
+        // will be stored by the browser, and the dashboard layout's server 
+        // component will read it on the next request.
         window.location.href = '/dashboard';
       } else {
         alert(data.message || 'Login failed');
@@ -139,7 +134,7 @@ export default function LoginPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, fontSize: 13 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
+                <input type="checkbox" />
                 Remember me
               </label>
               <a href="/forgot-password" style={{ color: 'var(--primary)', fontWeight: 600 }}>

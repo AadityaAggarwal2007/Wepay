@@ -50,7 +50,6 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       message: 'Login successful',
-      token, // Send token in body so client can set cookie directly
       user: {
         id: user.id,
         name: user.name,
@@ -60,9 +59,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Set httpOnly cookie — the browser will store this from the fetch() response
+    // and send it on subsequent page navigations.
     response.cookies.set('wepay_token', token, {
       httpOnly: true,
-      secure: (process.env.NEXT_PUBLIC_URL || '').startsWith('https'),
+      secure: false, // HTTP (no SSL) — set to true when using HTTPS
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',

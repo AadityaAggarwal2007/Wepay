@@ -1,40 +1,41 @@
-'use client';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { verifyToken } from '@/lib/auth';
+import DashboardShell from '@/components/layout/DashboardShell';
 
-import { useState } from 'react';
-import Sidebar from '@/components/layout/Sidebar';
-import Topbar from '@/components/layout/Topbar';
-
-export default function DashboardLayout({
+/**
+ * Dashboard Layout — SERVER COMPONENT
+ * 
+ * This runs on the server for EVERY page navigation (just like Express.js did).
+ * It checks the auth cookie, verifies the JWT, and redirects to /login if invalid.
+ * No middleware needed — this is the most reliable auth pattern in Next.js.
+ */
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Read cookie server-side (same as Express req.cookies)
+  const cookieStore = await cookies();
+  const token = cookieStore.get('wepay_token')?.value;
 
-  // In production, these come from session/API
-  const userName = 'WePay User';
-  const userRole = 'API Partner';
+  // No cookie → redirect to login
+  if (!token) {
+    redirect('/login');
+  }
+
+  // Verify JWT (same as Express jwt.verify)
+  const payload = verifyToken(token);
+  if (!payload) {
+    redirect('/login');
+  }
 
   return (
-    <div>
-      <Sidebar
-        userName={userName}
-        userRole={userRole}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
-      <Topbar
-        userName={userName}
-        onMobileToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
-      <main className="main-content">
-        <div className="page-content">
-          {children}
-        </div>
-        <footer className="footer">
-          {new Date().getFullYear()} © <strong>WePay</strong> - All rights reserved.
-        </footer>
-      </main>
-    </div>
+    <DashboardShell
+      userName={payload.email?.split('@')[0] || 'User'}
+      userRole={payload.role || 'partner'}
+    >
+      {children}
+    </DashboardShell>
   );
 }
