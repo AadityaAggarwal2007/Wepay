@@ -1,0 +1,170 @@
+// WePay Payment Gateway — PostgreSQL Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String    @unique
+  mobile        String    @unique
+  passwordHash  String    @map("password_hash")
+  company       String?
+  panNumber     String?   @map("pan_number")
+  aadhaarNumber String?   @map("aadhaar_number")
+  location      String?
+  instanceId    String    @unique @default(uuid()) @map("instance_id")
+  role          String    @default("partner")
+  apiToken      String?   @unique @map("api_token")
+  webhookUrl    String?   @map("webhook_url")
+  webhookSecret String?   @map("webhook_secret")
+  sandboxMode   Boolean   @default(false) @map("sandbox_mode")
+  otpRequired   Boolean   @default(false) @map("otp_required")
+  whatsappAlert Boolean   @default(false) @map("whatsapp_alert")
+  emailAlert    Boolean   @default(false) @map("email_alert")
+  status        String    @default("active")
+  planId        Int?      @map("plan_id")
+  planExpiresAt DateTime? @map("plan_expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  merchants    Merchant[]
+  transactions Transaction[]
+  apiLogs      ApiLog[]
+  settings     Setting[]
+  plan         Plan?        @relation(fields: [planId], references: [id])
+
+  @@map("users")
+}
+
+model Plan {
+  id          Int      @id @default(autoincrement())
+  name        String
+  price       Float
+  durationMonths Int   @map("duration_months")
+  features    String   @default("[]") // JSON array
+  dynamicQr   Boolean  @default(false) @map("dynamic_qr")
+  paytmButton Boolean  @default(false) @map("paytm_button")
+  isPopular   Boolean  @default(false) @map("is_popular")
+  status      String   @default("active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  users User[]
+
+  @@map("plans")
+}
+
+model Merchant {
+  id               Int       @id @default(autoincrement())
+  userId           Int       @map("user_id")
+  type             String    // bharatpe, phonepe, etc
+  merchantId       String?   @map("merchant_id")
+  mobile           String
+  upiId            String?   @map("upi_id")
+  cookie           String?   @db.Text
+  token            String?   @db.Text
+  loginUsername     String?   @map("login_username")
+  loginPassword    String?   @map("login_password")
+  mcc              String?   @default("5411")
+  sign             String?
+  orgid            String?   @default("159002")
+  status           String    @default("active")
+  verified         Boolean   @default(false)
+  lastCookieRefresh DateTime? @map("last_cookie_refresh")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("merchants")
+}
+
+model Transaction {
+  id                 Int       @id @default(autoincrement())
+  userId             Int       @map("user_id")
+  merchantId         Int?      @map("merchant_id")
+  orderId            String    @unique @map("order_id")
+  gatewayTxn         String?   @map("gateway_txn")
+  customerName       String?   @map("customer_name")
+  customerMobile     String?   @map("customer_mobile")
+  amount             Float
+  status             String    @default("PENDING")
+  utr                String?
+  paymentMethod      String?   @map("payment_method")
+  redirectUrl        String?   @map("redirect_url")
+  remark1            String?
+  remark2            String?
+  cancelReason       String?   @map("cancel_reason")
+  paymentPageOpened  Boolean   @default(false) @map("payment_page_opened")
+  paymentPageOpenedAt DateTime? @map("payment_page_opened_at")
+  timeOnPage         Int?      @map("time_on_page")
+  sandbox            Boolean   @default(false)
+  expiresAt          DateTime? @map("expires_at")
+  webhookSent        Boolean   @default(false) @map("webhook_sent")
+  webhookAttempts    Int       @default(0) @map("webhook_attempts")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  merchant Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  webhookLogs WebhookLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerMobile])
+  @@map("transactions")
+}
+
+model ApiLog {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  endpoint       String
+  method         String
+  requestBody    String?  @map("request_body") @db.Text
+  responseBody   String?  @map("response_body") @db.Text
+  responseStatus Int?     @map("response_status")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  durationMs     Int?     @map("duration_ms")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("api_logs")
+}
+
+model WebhookLog {
+  id             Int      @id @default(autoincrement())
+  transactionId  Int      @map("transaction_id")
+  url            String
+  payload        String?  @db.Text
+  responseStatus Int?     @map("response_status")
+  responseBody   String?  @map("response_body") @db.Text
+  attempt        Int      @default(1)
+  success        Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@map("webhook_logs")
+}
+
+model Setting {
+  id     Int    @id @default(autoincrement())
+  userId Int    @map("user_id")
+  key    String
+  value  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@map("settings")
+}
