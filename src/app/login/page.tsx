@@ -21,11 +21,13 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile, password }),
+        credentials: 'same-origin',
       });
 
       const data = await res.json();
       if (data.success) {
-        router.push('/dashboard');
+        // Hard navigation — ensures browser sends the cookie on the next request
+        window.location.href = '/dashboard';
       } else {
         alert(data.message || 'Login failed');
       }
