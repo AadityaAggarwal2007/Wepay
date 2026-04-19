@@ -40,20 +40,26 @@ export async function GET(request: NextRequest) {
       where: { userId: user.id, paymentMethod: 'payment_link', status: 'PENDING' },
     });
 
+    const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+
     return NextResponse.json({
-      links: links.map(l => ({
-        id: l.id,
-        orderId: l.orderId,
-        mobile: l.customerMobile,
-        amount: l.amount,
-        status: l.status,
-        utr: l.utr,
-        merchant: l.merchant?.type || 'N/A',
-        date: l.createdAt.toISOString(),
-      })),
+      success: true,
+      links: links.map(l => {
+        const paymentData = encodePaymentData({ oid: l.orderId, uid: user.id, amt: l.amount });
+        return {
+          id: l.id,
+          orderId: l.orderId,
+          customerMobile: l.customerMobile,
+          customerName: l.customerName,
+          amount: l.amount,
+          status: l.status,
+          utr: l.utr,
+          remark1: l.remark1,
+          createdAt: l.createdAt.toISOString(),
+          paymentUrl: `${baseUrl}/pay?data=${paymentData}`,
+        };
+      }),
       total,
-      page,
-      perPage,
       stats: {
         todayCollection,
         todayLinks,
@@ -76,7 +82,10 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { name, mobile, amount, remark } = body;
+    const { customer_name, customer_mobile, amount, remark1 } = body;
+    const name = customer_name;
+    const mobile = customer_mobile;
+    const remark = remark1;
 
     if (!mobile || !amount) {
       return NextResponse.json({ error: 'Mobile and amount are required' }, { status: 400 });
