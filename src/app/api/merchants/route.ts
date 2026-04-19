@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getSessionUser } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { encrypt } from '@/lib/encryption';
 import { BharatPeService } from '@/lib/bharatpe';
 
 /**
  * GET — List all merchants for the logged-in user
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const merchants = await prisma.merchant.findMany({
@@ -40,7 +40,7 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await request.json();

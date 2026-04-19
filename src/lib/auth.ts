@@ -53,6 +53,22 @@ export async function getSessionUser() {
   }
 }
 
+/**
+ * Read auth from NextRequest cookies directly — use this in API routes.
+ * More reliable than getSessionUser() which uses cookies() from next/headers.
+ */
+export async function getUserFromRequest(request: { cookies: { get: (name: string) => { value: string } | undefined } }) {
+  try {
+    const token = request.cookies.get('wepay_token')?.value;
+    if (!token) return null;
+    const payload = verifyToken(token);
+    if (!payload) return null;
+    return prisma.user.findUnique({ where: { id: payload.userId }, include: { plan: true } });
+  } catch {
+    return null;
+  }
+}
+
 export function generateApiToken(): string {
   const chars = 'abcdef0123456789';
   let token = '';
