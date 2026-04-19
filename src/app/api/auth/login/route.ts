@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       message: 'Login successful',
+      token, // Send token in body so client can set cookie directly
       user: {
         id: user.id,
         name: user.name,

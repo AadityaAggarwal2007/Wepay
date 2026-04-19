@@ -25,15 +25,18 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
-      if (data.success) {
-        // Hard navigation — ensures browser sends the cookie on the next request
+      if (data.success && data.token) {
+        // Set cookie directly via document.cookie — most reliable method
+        const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
+        document.cookie = `wepay_token=${data.token}; path=/; expires=${expires}; SameSite=Lax`;
+        // Full page navigation to dashboard
         window.location.href = '/dashboard';
       } else {
         alert(data.message || 'Login failed');
+        setLoading(false);
       }
     } catch {
       alert('Network error. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
