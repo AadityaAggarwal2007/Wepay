@@ -140,7 +140,10 @@ export class BharatPeService {
     try {
       const { amount, timeRange = 15 } = options;
 
+      // BharatPe deprecated /transactions and /merchantTransactions (302 redirect).
+      // New endpoint: /allHistory?type=txns works as of Apr 2026.
       const possibleEndpoints = [
+        `https://enterprise.bharatpe.in/v1/api/allHistory?type=txns&merchant_id=${merchantId}&page=1&limit=20`,
         `https://enterprise.bharatpe.in/v1/api/transactions?page=1&limit=20&type=CREDIT`,
         `https://enterprise.bharatpe.in/v1/api/merchantTransactions?merchant_id=${merchantId}&page=1&limit=20`,
       ];
@@ -150,16 +153,14 @@ export class BharatPeService {
           const response = await axios.get(url, {
             headers: this._headers(cookie, token),
             timeout: 10000,
-            maxRedirects: 0, // Don't follow redirects — 302 means session expired
+            maxRedirects: 0, // Don't follow redirects — 302 means endpoint deprecated
             validateStatus: () => true,
           });
 
-          // 302 redirect = BharatPe session expired (redirects HTTPS→HTTP)
+          // 302 redirect = endpoint deprecated or session expired
           if (response.status === 302 || response.status === 301) {
-            console.log(`[BharatPe] Session expired — got ${response.status} redirect on ${url}`);
-            const result: BPTransaction[] & { authFailed?: boolean } = [];
-            result.authFailed = true;
-            return result;
+            console.log(`[BharatPe] Redirect on ${url.split('?')[0].split('/').pop()} — trying next endpoint`);
+            continue; // Try next endpoint instead of marking as auth failure
           }
 
           if (response.status === 401 || response.status === 403) {
@@ -170,23 +171,45 @@ export class BharatPeService {
           }
 
           if (response.status === 200 && response.data) {
-            const transactions: BPTransaction[] =
-              response.data.data || response.data.transactions || response.data || [];
+            // allHistory returns { success: true, data: { transactions: [...], ... } }
+            // Old endpoints return { data: [...] } or { transactions: [...] }
+            const raw = response.data;
+            let transactions: BPTransaction[] = [];
 
-            if (!Array.isArray(transactions)) continue;
+            if (raw.data?.transactions && Array.isArray(raw.data.transactions)) {
+              transactions = raw.data.transactions;
+            } else if (raw.data?.data && Array.isArray(raw.data.data)) {
+              transactions = raw.data.data;
+            } else if (Array.isArray(raw.data)) {
+              transactions = raw.data;
+            } else if (Array.isArray(raw.transactions)) {
+              transactions = raw.transactions;
+            } else if (raw.success && raw.data && typeof raw.data === 'object') {
+              // allHistory may have nested structure — look for any array
+              for (const key of Object.keys(raw.data)) {
+                if (Array.isArray(raw.data[key]) && raw.data[key].length > 0) {
+                  transactions = raw.data[key];
+                  break;
+                }
+              }
+            }
+
+            console.log(`[BharatPe] ${url.split('?')[0].split('/').pop()}: found ${transactions.length} transactions`);
+
+            if (!Array.isArray(transactions) || transactions.length === 0) continue;
 
             if (amount) {
               const cutoff = new Date(Date.now() - timeRange * 60 * 1000);
               return transactions.filter((txn) => {
-                const txnAmount = parseFloat(txn.amount);
-                const txnDate = new Date(txn.created_at || txn.date || txn.createdAt || '');
+                const txnAmount = parseFloat(txn.amount || txn.txn_amount || '0');
+                const txnDate = new Date(txn.created_at || txn.date || txn.createdAt || txn.transaction_date || '');
                 return txnAmount === parseFloat(String(amount)) && txnDate > cutoff;
               });
             }
             return transactions;
           }
-        } catch {
-          // Try next endpoint
+        } catch (err) {
+          console.log(`[BharatPe] Error on ${url.split('?')[0].split('/').pop()}:`, (err as Error).message);
         }
       }
 
