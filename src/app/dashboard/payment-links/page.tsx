@@ -33,7 +33,7 @@ export default function PaymentLinksPage() {
 
   const fetchLinks = async () => {
     try {
-      const res = await fetch('/api/payment-links');
+      const res = await fetch('/api/payment-links', { credentials: 'include' });
       const data = await res.json();
       if (data.success) setLinks(data.links || []);
     } catch {
@@ -52,6 +52,7 @@ export default function PaymentLinksPage() {
     try {
       const res = await fetch('/api/payment-links', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer_mobile: mobile,

@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     // and send it on subsequent page navigations.
     response.cookies.set('wepay_token', token, {
       httpOnly: true,
-      secure: false, // HTTP (no SSL) — set to true when using HTTPS
+      secure: true, // HTTPS via Cloudflare
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',

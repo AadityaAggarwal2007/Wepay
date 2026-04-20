@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set('wepay_token', token, {
       httpOnly: true,
-      secure: false, // HTTP — set to true when using HTTPS
+      secure: true, // HTTPS via Cloudflare
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
