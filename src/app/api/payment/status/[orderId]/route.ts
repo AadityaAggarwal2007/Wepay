@@ -103,11 +103,13 @@ export async function GET(
     // ── Live mode: Check BharatPe for real payment detection ──
     if (!transaction.sandbox && transaction.status === 'PENDING' && transaction.merchant) {
       const merchant = transaction.merchant;
+      console.log(`[PAYMENT] Checking BharatPe: merchant=${merchant.id}, status=${merchant.status}, hasCookie=${!!merchant.cookie}`);
 
       if (merchant.cookie && merchant.status === 'active') {
         try {
           // Use cached credentials — avoids AES decryption on every poll
           const creds = getCachedCredentials(merchant);
+          console.log(`[PAYMENT] Credentials: ${creds ? 'OK' : 'NULL'}, merchantId=${creds?.merchantId}`);
 
           if (creds) {
             // Check BharatPe for matching transaction
@@ -117,6 +119,8 @@ export async function GET(
               creds.token,
               { amount: transaction.amount, timeRange: 15 }
             );
+
+            console.log(`[PAYMENT] BharatPe returned ${recentTxns.length} transactions, authFailed=${(recentTxns as unknown as { authFailed?: boolean }).authFailed}`);
 
             // Check if auth failed — mark merchant as expired
             if ((recentTxns as unknown as { authFailed?: boolean }).authFailed) {
@@ -154,9 +158,13 @@ export async function GET(
           }
         } catch (err) {
           // Silent fail — polling will retry in 2 seconds
-          console.error('[PAYMENT] BharatPe check error:', (err as Error).message);
+          console.error('[PAYMENT] BharatPe check error:', (err as Error).message, (err as Error).stack);
         }
+      } else {
+        console.log(`[PAYMENT] Skipping BharatPe check: cookie=${!!merchant.cookie}, status=${merchant.status}`);
       }
+    } else {
+      console.log(`[PAYMENT] Skipping BharatPe: sandbox=${transaction.sandbox}, status=${transaction.status}, hasMerchant=${!!transaction.merchant}`);
     }
 
     // ── Still pending ──
