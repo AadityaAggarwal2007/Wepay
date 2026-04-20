@@ -8,8 +8,13 @@ import { encodePaymentData } from '@/lib/upi';
  */
 export async function GET(request: NextRequest) {
   try {
+    // DEBUG: Log cookie state
+    const tokenCookie = request.cookies.get('wepay_token');
+    console.log('[PAYMENT-LINKS GET] Cookie present:', !!tokenCookie, 'All cookies:', request.cookies.getAll().map(c => c.name));
+    
     const user = await getUserFromRequest(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log('[PAYMENT-LINKS GET] User result:', user ? `id=${user.id}` : 'NULL');
+    if (!user) return NextResponse.json({ error: 'Unauthorized', debug: { hasCookie: !!tokenCookie, cookieNames: request.cookies.getAll().map(c => c.name) } }, { status: 401 });
 
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get('page') || '1');
