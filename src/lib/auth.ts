@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { cookies } from 'next/headers';
 import { prisma } from './db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'wepay-secret-key-change-in-production';
@@ -33,40 +32,31 @@ export function verifyToken(token: string): JWTPayload | null {
   }
 }
 
-export async function getSessionUser() {
+/**
+ * Extract the Bearer token from the Authorization header and return the user.
+ * Used in ALL API routes. No cookies involved.
+ */
+export async function getUserFromRequest(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('wepay_token')?.value;
-    if (!token) return null;
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
 
+    const token = authHeader.slice(7); // Remove 'Bearer '
     const payload = verifyToken(token);
     if (!payload) return null;
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      include: { plan: true },
-    });
-
-    return user;
+    return prisma.user.findUnique({ where: { id: payload.userId }, include: { plan: true } });
   } catch {
     return null;
   }
 }
 
 /**
- * Read auth from NextRequest cookies directly — use this in API routes.
- * More reliable than getSessionUser() which uses cookies() from next/headers.
+ * Verify a raw token string and return the payload.
+ * Used for server-side token verification (e.g., in layouts).
  */
-export async function getUserFromRequest(request: { cookies: { get: (name: string) => { value: string } | undefined } }) {
-  try {
-    const token = request.cookies.get('wepay_token')?.value;
-    if (!token) return null;
-    const payload = verifyToken(token);
-    if (!payload) return null;
-    return prisma.user.findUnique({ where: { id: payload.userId }, include: { plan: true } });
-  } catch {
-    return null;
-  }
+export function verifyTokenPayload(token: string): JWTPayload | null {
+  return verifyToken(token);
 }
 
 export function generateApiToken(): string {

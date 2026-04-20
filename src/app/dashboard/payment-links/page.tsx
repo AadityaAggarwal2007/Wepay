@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { authFetch } from '@/lib/authFetch';
 
 interface PaymentLink {
   id: number;
@@ -33,7 +34,7 @@ export default function PaymentLinksPage() {
 
   const fetchLinks = async () => {
     try {
-      const res = await fetch('/api/payment-links', { credentials: 'include' });
+      const res = await authFetch('/api/payment-links');
       const data = await res.json();
       if (data.success) setLinks(data.links || []);
     } catch {
@@ -50,9 +51,8 @@ export default function PaymentLinksPage() {
     setGeneratedLink('');
 
     try {
-      const res = await fetch('/api/payment-links', {
+      const res = await authFetch('/api/payment-links', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer_mobile: mobile,

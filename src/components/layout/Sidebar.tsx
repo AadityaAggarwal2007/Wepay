@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { removeToken } from '@/lib/authFetch';
 
 interface SidebarProps {
   userName: string;
@@ -46,6 +47,7 @@ const navItems = [
 
 export default function Sidebar({ userName, userRole, isOpen, onToggle }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const getInitials = (name: string) => {
     return name
@@ -54,6 +56,11 @@ export default function Sidebar({ userName, userRole, isOpen, onToggle }: Sideba
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const handleLogout = () => {
+    removeToken();
+    router.replace('/login');
   };
 
   return (
@@ -115,15 +122,20 @@ export default function Sidebar({ userName, userRole, isOpen, onToggle }: Sideba
               </span>
               Support
             </a>
-            <Link href="/api/auth/logout" className="sidebar-link" style={{ color: 'var(--danger)' }}>
+            <button
+              onClick={handleLogout}
+              className="sidebar-link"
+              style={{ color: 'var(--danger)', width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', font: 'inherit', padding: 'inherit' }}
+            >
               <span className="icon">
                 <i className="fas fa-sign-out-alt" />
               </span>
               Logout
-            </Link>
+            </button>
           </div>
         </nav>
       </aside>
     </>
   );
 }
+

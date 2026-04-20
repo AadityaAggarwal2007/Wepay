@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { setToken } from '@/lib/authFetch';
 
 export default function LoginPage() {
   const [mobile, setMobile] = useState('');
@@ -21,10 +22,10 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
-      if (data.success) {
-        // Full page navigation — the Set-Cookie header from the API response
-        // will be stored by the browser, and the dashboard layout's server 
-        // component will read it on the next request.
+      if (data.success && data.token) {
+        // Store token in localStorage
+        setToken(data.token);
+        // Navigate to dashboard
         window.location.href = '/dashboard';
       } else {
         alert(data.message || 'Login failed');

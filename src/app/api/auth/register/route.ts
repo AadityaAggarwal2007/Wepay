@@ -59,22 +59,13 @@ export async function POST(request: NextRequest) {
       role: user.role,
     });
 
-    const response = NextResponse.json({
+    // Return token in response body — client stores it in localStorage
+    return NextResponse.json({
       success: true,
       message: 'Registration successful',
+      token,
       user: { id: user.id, name: user.name, mobile: user.mobile },
     });
-
-    const isSecure = request.headers.get('x-forwarded-proto') === 'https';
-    response.cookies.set('wepay_token', token, {
-      httpOnly: true,
-      secure: isSecure,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
-      path: '/',
-    });
-
-    return response;
   } catch (error) {
     console.error('Register error:', error);
     return NextResponse.json(

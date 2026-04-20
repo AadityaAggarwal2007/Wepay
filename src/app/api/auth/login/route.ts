@@ -47,9 +47,11 @@ export async function POST(request: NextRequest) {
       role: user.role,
     });
 
-    const response = NextResponse.json({
+    // Return token in response body — client stores it in localStorage
+    return NextResponse.json({
       success: true,
       message: 'Login successful',
+      token,
       user: {
         id: user.id,
         name: user.name,
@@ -58,19 +60,6 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
     });
-
-    // Cloudflare Flexible SSL: browser→CF is HTTPS, CF→origin is HTTP
-    // Cookie must NOT be Secure when origin receives HTTP, otherwise browser won't store it
-    const isSecure = request.headers.get('x-forwarded-proto') === 'https';
-    response.cookies.set('wepay_token', token, {
-      httpOnly: true,
-      secure: isSecure,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-    });
-
-    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(

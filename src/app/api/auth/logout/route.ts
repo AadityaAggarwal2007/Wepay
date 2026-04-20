@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 
+/**
+ * Logout — just returns a success response.
+ * The client is responsible for clearing the token from localStorage.
+ */
+export async function POST() {
+  return NextResponse.json({ success: true, message: 'Logged out' });
+}
+
+// Also support GET for backward compatibility (sidebar link)
 export async function GET() {
-  const response = NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'));
-  response.cookies.delete('wepay_token');
-  return response;
+  return NextResponse.json({ success: true, message: 'Logged out' });
 }
