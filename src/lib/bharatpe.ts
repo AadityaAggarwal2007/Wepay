@@ -150,8 +150,17 @@ export class BharatPeService {
           const response = await axios.get(url, {
             headers: this._headers(cookie, token),
             timeout: 10000,
+            maxRedirects: 0, // Don't follow redirects — 302 means session expired
             validateStatus: () => true,
           });
+
+          // 302 redirect = BharatPe session expired (redirects HTTPS→HTTP)
+          if (response.status === 302 || response.status === 301) {
+            console.log(`[BharatPe] Session expired — got ${response.status} redirect on ${url}`);
+            const result: BPTransaction[] & { authFailed?: boolean } = [];
+            result.authFailed = true;
+            return result;
+          }
 
           if (response.status === 401 || response.status === 403) {
             console.log(`[BharatPe] Auth failed (${response.status}) — credentials expired`);
