@@ -65,9 +65,10 @@ export async function POST(request: NextRequest) {
       user: { id: user.id, name: user.name, mobile: user.mobile },
     });
 
+    const isSecure = request.headers.get('x-forwarded-proto') === 'https';
     response.cookies.set('wepay_token', token, {
       httpOnly: true,
-      secure: true, // HTTPS via Cloudflare
+      secure: isSecure,
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60,
       path: '/',

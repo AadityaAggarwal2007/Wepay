@@ -59,11 +59,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Set httpOnly cookie — the browser will store this from the fetch() response
-    // and send it on subsequent page navigations.
+    // Cloudflare Flexible SSL: browser→CF is HTTPS, CF→origin is HTTP
+    // Cookie must NOT be Secure when origin receives HTTP, otherwise browser won't store it
+    const isSecure = request.headers.get('x-forwarded-proto') === 'https';
     response.cookies.set('wepay_token', token, {
       httpOnly: true,
-      secure: true, // HTTPS via Cloudflare
+      secure: isSecure,
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',
