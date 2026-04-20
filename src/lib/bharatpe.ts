@@ -15,9 +15,11 @@ interface TransactionCheckOptions {
 
 interface BPTransaction {
   amount: string;
+  txn_amount?: string;
   created_at?: string;
   date?: string;
   createdAt?: string;
+  transaction_date?: string;
   utr?: string;
   reference_id?: string;
   [key: string]: unknown;
@@ -201,8 +203,8 @@ export class BharatPeService {
             if (amount) {
               const cutoff = new Date(Date.now() - timeRange * 60 * 1000);
               return transactions.filter((txn) => {
-                const txnAmount = parseFloat(txn.amount || txn.txn_amount || '0');
-                const txnDate = new Date(txn.created_at || txn.date || txn.createdAt || txn.transaction_date || '');
+                const txnAmount = parseFloat(String(txn.amount || txn.txn_amount || '0'));
+                const txnDate = new Date(String(txn.created_at || txn.date || txn.createdAt || txn.transaction_date || ''));
                 return txnAmount === parseFloat(String(amount)) && txnDate > cutoff;
               });
             }
