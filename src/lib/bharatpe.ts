@@ -36,12 +36,22 @@ export class BharatPeService {
   static _headers(cookie: string, token?: string | null): Record<string, string> {
     const headers: Record<string, string> = {
       'Cookie': cookie,
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'application/json, text/plain, */*',
-      'Accept-Language': 'en-US,en;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/javascript, */*; q=0.01',
+      'Accept-Language': 'en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Encoding': 'gzip, deflate, br',
       'Origin': 'https://enterprise.bharatpe.in',
-      'Referer': 'https://enterprise.bharatpe.in/',
+      'Referer': 'https://enterprise.bharatpe.in/home',
+      'X-Requested-With': 'XMLHttpRequest', // Required by Laravel CSRF
+      'Sec-Fetch-Dest': 'empty',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'same-origin',
     };
+    // Extract XSRF-TOKEN from cookie and set as header (Laravel requirement)
+    const xsrfMatch = cookie.match(/XSRF-TOKEN=([^;]+)/);
+    if (xsrfMatch) {
+      headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfMatch[1]);
+    }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
       headers['token'] = token;
