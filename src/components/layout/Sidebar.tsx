@@ -24,7 +24,7 @@ const navItems = [
       { href: '/dashboard/merchants', label: 'Connect Merchant', icon: 'fas fa-store' },
       { href: '/dashboard/payment-links', label: 'Payment Link', icon: 'fas fa-link' },
       { href: '/dashboard/transactions', label: 'Transactions', icon: 'fas fa-exchange-alt' },
-      { href: '/dashboard/subscription', label: 'Subscription', icon: 'fas fa-crown' },
+      { href: '/dashboard/wordpress-guide', label: 'WordPress Guide', icon: 'fab fa-wordpress' },
     ],
   },
   {
