@@ -1,17 +1,62 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { authFetch } from '@/lib/authFetch';
 
-const mockTransactions = [
-  { id: 1, mobile: '9289144767', date: '2026-04-19 10:33:12', merchant: 'Bharatpe', gtwTxn: '69e46210c8aed', orderId: '6542748542792', amount: 1.12, status: 'FAILED' },
-  { id: 2, mobile: '9289144767', date: '2026-04-19 01:22:59', merchant: 'Bharatpe', gtwTxn: '69e3e11b7bbb4', orderId: '3199865819684', amount: 1.27, status: 'FAILED' },
-  { id: 3, mobile: '9289144767', date: '2026-04-19 01:03:52', merchant: 'Bharatpe', gtwTxn: '69e3dca0f0589', orderId: '4072932176747', amount: 1.32, status: 'FAILED' },
-  { id: 4, mobile: '9289144767', date: '2026-04-19 00:59:28', merchant: 'Bharatpe', gtwTxn: '69e3db984a8b7', orderId: '9171473098593', amount: 3.69, status: 'FAILED' },
-];
+interface Transaction {
+  id: number;
+  orderId: string;
+  gatewayTxn: string | null;
+  mobile: string;
+  amount: number;
+  status: string;
+  utr: string | null;
+  merchant: string;
+  date: string;
+}
+
+interface Stats {
+  [key: string]: { amount: number; count: number };
+}
 
 export default function TransactionsPage() {
   const [filter, setFilter] = useState('All');
   const [perPage, setPerPage] = useState(10);
+  const [page, setPage] = useState(1);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [stats, setStats] = useState<Stats>({});
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await authFetch(`/api/transactions?status=${filter}&page=${page}&perPage=${perPage}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTransactions(data.transactions || []);
+        setStats(data.stats || {});
+        setTotal(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+      }
+    } catch (e) {
+      console.error('Failed to fetch transactions:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, page, perPage]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => { setPage(1); }, [filter, perPage]);
+
+  const fmt = (n: number) => `₹${n.toFixed(2)}`;
+  const totalReceived = Object.values(stats).reduce((s, v) => s + v.amount, 0);
+  const totalTxns = Object.values(stats).reduce((s, v) => s + v.count, 0);
 
   return (
     <>
@@ -24,27 +69,27 @@ export default function TransactionsPage() {
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-icon"><i className="fas fa-credit-card" /></div>
-          <div className="stat-value">₹7.40</div>
+          <div className="stat-value">{fmt(totalReceived)}</div>
           <div className="stat-label">All Time Received</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>4 transactions</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{totalTxns} transactions</div>
         </div>
         <div className="stat-card green">
           <div className="stat-icon" style={{ background: '#ecfdf5' }}><span style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--success)', display: 'block' }} /></div>
-          <div className="stat-value">₹0.00</div>
+          <div className="stat-value">{fmt(stats['SUCCESS']?.amount || 0)}</div>
           <div className="stat-label">All Time Success</div>
-          <div className="stat-change up">↑ 0 txns</div>
+          <div className="stat-change up">↑ {stats['SUCCESS']?.count || 0} txns</div>
         </div>
         <div className="stat-card orange">
           <div className="stat-icon" style={{ background: '#fffbeb' }}><span style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--warning)', display: 'block' }} /></div>
-          <div className="stat-value">₹0.00</div>
+          <div className="stat-value">{fmt(stats['PENDING']?.amount || 0)}</div>
           <div className="stat-label">All Time Pending</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>0 txns</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{stats['PENDING']?.count || 0} txns</div>
         </div>
         <div className="stat-card red">
           <div className="stat-icon" style={{ background: '#fef2f2' }}><span style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--danger)', display: 'block' }} /></div>
-          <div className="stat-value">₹7.40</div>
+          <div className="stat-value">{fmt(stats['FAILED']?.amount || 0)}</div>
           <div className="stat-label">All Time Failed</div>
-          <div className="stat-change down">↓ 4 txns</div>
+          <div className="stat-change down">↓ {stats['FAILED']?.count || 0} txns</div>
         </div>
       </div>
 
@@ -62,6 +107,7 @@ export default function TransactionsPage() {
               <option value="SUCCESS">Success</option>
               <option value="PENDING">Pending</option>
               <option value="FAILED">Failed</option>
+              <option value="EXPIRED">Expired</option>
             </select>
           </div>
         </div>
@@ -87,49 +133,62 @@ export default function TransactionsPage() {
             </div>
           </div>
 
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Mobile</th>
-                <th>Date Time</th>
-                <th>Merchant</th>
-                <th>Gateway TXN</th>
-                <th>UTR</th>
-                <th>Order ID</th>
-                <th>Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockTransactions
-                .filter(t => filter === 'All' || t.status === filter)
-                .map((txn) => (
-                <tr key={txn.id}>
-                  <td>{txn.id}</td>
-                  <td style={{ fontWeight: 500 }}>{txn.mobile}</td>
-                  <td style={{ fontSize: 12 }}>{txn.date}</td>
-                  <td>{txn.merchant}</td>
-                  <td style={{ fontSize: 12, fontFamily: 'monospace' }}>{txn.gtwTxn}</td>
-                  <td style={{ color: 'var(--text-muted)' }}>-</td>
-                  <td style={{ fontSize: 12, fontFamily: 'monospace' }}>{txn.orderId}</td>
-                  <td style={{ fontWeight: 700 }}>₹{txn.amount.toFixed(2)}</td>
-                  <td>
-                    <span className={`badge ${txn.status === 'SUCCESS' ? 'badge-success' : txn.status === 'PENDING' ? 'badge-warning' : 'badge-danger'}`}>
-                      {txn.status}
-                    </span>
-                  </td>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <i className="fas fa-spinner fa-spin" style={{ fontSize: 20 }} /> Loading...
+            </div>
+          ) : transactions.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <i className="fas fa-inbox" style={{ fontSize: 32, marginBottom: 12, display: 'block' }} />
+              No transactions found
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Mobile</th>
+                  <th>Date Time</th>
+                  <th>Merchant</th>
+                  <th>Gateway TXN</th>
+                  <th>UTR</th>
+                  <th>Order ID</th>
+                  <th>Amount</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {transactions.map((txn, idx) => (
+                  <tr key={txn.id}>
+                    <td>{(page - 1) * perPage + idx + 1}</td>
+                    <td style={{ fontWeight: 500 }}>{txn.mobile}</td>
+                    <td style={{ fontSize: 12 }}>{new Date(txn.date).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'medium' })}</td>
+                    <td>{txn.merchant}</td>
+                    <td style={{ fontSize: 12, fontFamily: 'monospace' }}>{txn.gatewayTxn || '-'}</td>
+                    <td style={{ fontSize: 12, fontFamily: 'monospace', color: txn.utr ? 'var(--success)' : 'var(--text-muted)' }}>{txn.utr || '-'}</td>
+                    <td style={{ fontSize: 12, fontFamily: 'monospace' }}>{txn.orderId}</td>
+                    <td style={{ fontWeight: 700 }}>₹{txn.amount.toFixed(2)}</td>
+                    <td>
+                      <span className={`badge ${txn.status === 'SUCCESS' ? 'badge-success' : txn.status === 'PENDING' ? 'badge-warning' : txn.status === 'EXPIRED' ? 'badge-secondary' : 'badge-danger'}`}>
+                        {txn.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
           <div className="pagination">
-            <span className="pagination-info">Showing 1 to {mockTransactions.length} of {mockTransactions.length} entries</span>
+            <span className="pagination-info">
+              Showing {Math.min((page - 1) * perPage + 1, total)} to {Math.min(page * perPage, total)} of {total} entries
+            </span>
             <div className="pagination-controls">
-              <button className="pagination-btn">Previous</button>
-              <button className="pagination-btn active">1</button>
-              <button className="pagination-btn">Next</button>
+              <button className="pagination-btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
+                <button key={p} className={`pagination-btn ${page === p ? 'active' : ''}`} onClick={() => setPage(p)}>{p}</button>
+              ))}
+              <button className="pagination-btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
             </div>
           </div>
         </div>
