@@ -1,31 +1,104 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { authFetch } from '@/lib/authFetch';
+
+interface UserSettings {
+  id: number;
+  instanceId: string;
+  mobile: string;
+  email: string;
+  name: string;
+  company: string;
+  panNumber: string;
+  aadhaarNumber: string;
+  location: string;
+  otpRequired: boolean;
+  whatsappAlert: boolean;
+  emailAlert: boolean;
+}
 
 export default function SettingsPage() {
   const [form, setForm] = useState({
-    instanceId: 'INST17765402628212549',
-    mobile: '9289144767',
-    email: 'aadityaaggarwal3526@gmail.com',
-    name: 'Aaditya aggarwal',
-    company: 'student',
-    pan: 'ABCPR1234A',
-    aadhaar: '256729852104',
-    userId: '471',
-    location: 'new delhi',
-    otpRequired: 'NO',
-    whatsappAlert: 'NO',
-    emailAlert: 'NO',
+    instanceId: '', mobile: '', email: '', name: '',
+    company: '', pan: '', aadhaar: '', userId: '',
+    location: '', otpRequired: 'NO', whatsappAlert: 'NO', emailAlert: 'NO',
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/settings');
+      if (res.ok) {
+        const data: UserSettings = await res.json();
+        setForm({
+          instanceId: data.instanceId || '',
+          mobile: data.mobile || '',
+          email: data.email || '',
+          name: data.name || '',
+          company: data.company || '',
+          pan: data.panNumber || '',
+          aadhaar: data.aadhaarNumber || '',
+          userId: String(data.id || ''),
+          location: data.location || '',
+          otpRequired: data.otpRequired ? 'YES' : 'NO',
+          whatsappAlert: data.whatsappAlert ? 'YES' : 'NO',
+          emailAlert: data.emailAlert ? 'YES' : 'NO',
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load settings:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   const handleChange = (key: string, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Settings saved successfully!');
+    setSaving(true);
+    try {
+      const res = await authFetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          company: form.company,
+          panNumber: form.pan,
+          aadhaarNumber: form.aadhaar,
+          location: form.location,
+          otpRequired: form.otpRequired,
+          whatsappAlert: form.whatsappAlert,
+          emailAlert: form.emailAlert,
+        }),
+      });
+      if (res.ok) {
+        alert('Settings saved successfully!');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to save settings');
+      }
+    } catch {
+      alert('Network error');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+        <i className="fas fa-spinner fa-spin" style={{ fontSize: 24 }} /> Loading settings...
+      </div>
+    );
+  }
 
   return (
     <div className="card">
@@ -127,8 +200,8 @@ export default function SettingsPage() {
           </div>
 
           <div className="text-center" style={{ borderTop: '1px solid var(--border-light)', paddingTop: 20 }}>
-            <button type="submit" className="btn btn-primary btn-lg">
-              <i className="fas fa-save" /> Save Changes
+            <button type="submit" className="btn btn-primary btn-lg" disabled={saving}>
+              <i className={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} /> {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

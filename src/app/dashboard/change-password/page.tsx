@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { authFetch } from '@/lib/authFetch';
 
 export default function ChangePasswordPage() {
   const [current, setCurrent] = useState('');
@@ -10,13 +11,37 @@ export default function ChangePasswordPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPwd !== confirm) {
       alert('Passwords do not match!');
       return;
     }
-    alert('Password changed successfully!');
+    if (newPwd.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await authFetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: current, newPassword: newPwd }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Password changed successfully!');
+        setCurrent(''); setNewPwd(''); setConfirm('');
+      } else {
+        alert(data.error || 'Failed to change password');
+      }
+    } catch {
+      alert('Network error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
