@@ -81,6 +81,7 @@ model Merchant {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 
+  @@index([userId, status])  // Dashboard + cron queries
   @@map("merchants")
 }
 
@@ -118,6 +119,10 @@ model Transaction {
   @@index([status])
   @@index([createdAt])
   @@index([customerMobile])
+  @@index([userId, status])              // Dashboard filters + transaction page
+  @@index([userId, createdAt])           // Dashboard chart + today stats
+  @@index([userId, status, createdAt])   // Combined filter queries
+  @@index([status, webhookSent])         // Cron webhook retry
   @@map("transactions")
 }
 
