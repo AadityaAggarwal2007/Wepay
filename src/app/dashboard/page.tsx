@@ -16,14 +16,16 @@ export default function DashboardPage() {
   const [chartPeriod, setChartPeriod] = useState('7D');
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [merchantHealth, setMerchantHealth] = useState<{ overall: string; merchants: { id: number; status: string; message: string; healthy: boolean; hoursSinceRefresh: number | null }[] } | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await authFetch('/api/dashboard');
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
-      }
+      const [dashRes, healthRes] = await Promise.all([
+        authFetch('/api/dashboard'),
+        authFetch('/api/merchants/health'),
+      ]);
+      if (dashRes.ok) setData(await dashRes.json());
+      if (healthRes.ok) setMerchantHealth(await healthRes.json());
     } catch (e) {
       console.error('Dashboard fetch error:', e);
     } finally {
@@ -61,6 +63,42 @@ export default function DashboardPage() {
 
   return (
     <>
+      {/* BharatPe Token Health Banner */}
+      {merchantHealth && (
+        <div style={{
+          padding: '12px 20px', borderRadius: 'var(--radius-md)', marginBottom: 20,
+          display: 'flex', alignItems: 'center', gap: 12,
+          background: merchantHealth.overall === 'HEALTHY'
+            ? 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.05))'
+            : merchantHealth.overall === 'EXPIRED'
+            ? 'linear-gradient(135deg, rgba(239,68,68,0.1), rgba(220,38,38,0.05))'
+            : 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(217,119,6,0.05))',
+          border: `1px solid ${merchantHealth.overall === 'HEALTHY' ? 'var(--success)' : merchantHealth.overall === 'EXPIRED' ? 'var(--danger)' : 'var(--warning)'}`,
+        }}>
+          <i className={`fas ${merchantHealth.overall === 'HEALTHY' ? 'fa-check-circle' : merchantHealth.overall === 'EXPIRED' ? 'fa-exclamation-triangle' : 'fa-info-circle'}`}
+            style={{ fontSize: 20, color: merchantHealth.overall === 'HEALTHY' ? 'var(--success)' : merchantHealth.overall === 'EXPIRED' ? 'var(--danger)' : 'var(--warning)' }}
+          />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>
+              {merchantHealth.overall === 'HEALTHY' && '🟢 Payment Detection Active'}
+              {merchantHealth.overall === 'EXPIRED' && '🔴 BharatPe Token Expired — Payments NOT being detected!'}
+              {merchantHealth.overall === 'NO_MERCHANTS' && '🟡 No merchants connected'}
+            </div>
+            {merchantHealth.overall === 'EXPIRED' && (
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                Login to <a href="https://enterprise.bharatpe.in" target="_blank" rel="noopener" style={{ color: 'var(--primary)', fontWeight: 600 }}>enterprise.bharatpe.in</a>,
+                open DevTools → Network, find a &quot;tesseract&quot; request, copy the <code style={{ background: 'var(--bg-body)', padding: '1px 4px', borderRadius: 3 }}>token</code> header and update via Connect Merchant.
+              </div>
+            )}
+            {merchantHealth.merchants?.[0]?.hoursSinceRefresh != null && merchantHealth.overall === 'HEALTHY' && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                Last verified {merchantHealth.merchants[0].hoursSinceRefresh}h ago
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stats Row */}
       <div className="stats-grid">
         <div className="stat-card blue">

@@ -79,39 +79,47 @@ export class BharatPeService {
   }
 
   /**
-   * Keep the session cookie alive by making lightweight API calls
-   * Returns true if session is still alive, false if expired
+   * Keep the session token alive by pinging the Tesseract API.
+   * Makes a lightweight transaction query to prevent token expiry.
+   * Returns true if token is still valid, false if expired.
    */
   static async keepAlive(cookie: string, token?: string | null): Promise<boolean> {
-    const endpoints = [
-      { url: 'https://enterprise.bharatpe.in/v1/api/brandMerchants', method: 'GET' as const },
-      { url: 'https://api-deposit.bharatpe.in/bharatpe-account/v1/account', method: 'GET' as const },
-    ];
+    if (!token) return false;
 
-    for (const endpoint of endpoints) {
-      try {
-        const response = await axios({
-          method: endpoint.method,
-          url: endpoint.url,
-          headers: this._headers(cookie, token),
-          timeout: 15000,
-          validateStatus: () => true,
-        });
+    try {
+      // Ping Tesseract with a tiny time window — just to validate the token
+      const now = Date.now();
+      const url = `https://payments-tesseract.bharatpe.in/api/v1/merchant/transactions?module=PAYMENT_QR&merchantId=0&sDate=${now - 60000}&eDate=${now}&pageSize=1&pageCount=0&isFromOtDashboard=1`;
 
-        if (response.status === 200) return true;
-        if (response.status === 401 || response.status === 403) {
-          console.log(`[BharatPe] Session expired (${response.status}) on ${endpoint.url}`);
-          return false;
-        }
-        console.log(`[BharatPe] Endpoint ${endpoint.url} returned ${response.status}, trying next...`);
-      } catch (error: unknown) {
-        const err = error as Error;
-        console.error(`[BharatPe] Keep-alive error on ${endpoint.url}:`, err.message);
+      const response = await axios.get(url, {
+        headers: {
+          'token': token,
+          'Accept': 'application/json',
+          'Origin': 'https://enterprise.bharatpe.in',
+          'Referer': 'https://enterprise.bharatpe.in/',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+        timeout: 10000,
+        validateStatus: () => true,
+      });
+
+      if (response.status === 200) {
+        console.log('[BharatPe] Keep-alive: token is alive ✅');
+        return true;
       }
-    }
 
-    console.log('[BharatPe] All keep-alive endpoints failed (network issue?), retrying later');
-    return true;
+      if (response.status === 401 || response.status === 403) {
+        console.log(`[BharatPe] Keep-alive: token expired (${response.status}) ❌`);
+        return false;
+      }
+
+      console.log(`[BharatPe] Keep-alive: status=${response.status}, assuming alive`);
+      return true;
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('[BharatPe] Keep-alive error:', err.message);
+      return true; // Network error — don't mark as expired
+    }
   }
 
   /**
