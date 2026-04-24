@@ -49,7 +49,7 @@ export default function DashboardLayout({
 
       setAuthState({
         ready: true,
-        userName: payload.email?.split('@')[0] || 'User',
+        userName: payload.name || payload.email?.split('@')[0] || 'User',
         userRole: payload.role || 'partner',
       });
     } catch {

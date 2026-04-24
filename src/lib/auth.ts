@@ -7,6 +7,7 @@ const TOKEN_EXPIRY = '7d';
 
 export interface JWTPayload {
   userId: number;
+  name: string;
   email: string;
   mobile: string;
   role: string;
