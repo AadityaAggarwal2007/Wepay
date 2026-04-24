@@ -140,8 +140,9 @@ export class BharatPeService {
   }
 
   /**
-   * Check recent transactions from BharatPe
-   * Used to auto-detect payment completion
+   * Check recent transactions from BharatPe using the Tesseract Payments API
+   * This is the correct API endpoint (payments-tesseract.bharatpe.in)
+   * It only requires the `token` header — no cookies needed!
    */
   static async checkRecentTransactions(
     merchantId: string,
@@ -152,79 +153,64 @@ export class BharatPeService {
     try {
       const { amount, timeRange = 15 } = options;
 
-      // BharatPe deprecated /transactions and /merchantTransactions (302 redirect).
-      // New endpoint: /allHistory?type=txns works as of Apr 2026.
-      const possibleEndpoints = [
-        `https://enterprise.bharatpe.in/v1/api/allHistory?type=txns&merchant_id=${merchantId}&page=1&limit=20`,
-        `https://enterprise.bharatpe.in/v1/api/transactions?page=1&limit=20&type=CREDIT`,
-        `https://enterprise.bharatpe.in/v1/api/merchantTransactions?merchant_id=${merchantId}&page=1&limit=20`,
-      ];
-
-      for (const url of possibleEndpoints) {
-        try {
-          const response = await axios.get(url, {
-            headers: this._headers(cookie, token),
-            timeout: 10000,
-            maxRedirects: 0, // Don't follow redirects — 302 means endpoint deprecated
-            validateStatus: () => true,
-          });
-
-          // 302 redirect = endpoint deprecated or session expired
-          if (response.status === 302 || response.status === 301) {
-            console.log(`[BharatPe] Redirect on ${url.split('?')[0].split('/').pop()} — trying next endpoint`);
-            continue; // Try next endpoint instead of marking as auth failure
-          }
-
-          if (response.status === 401 || response.status === 403) {
-            console.log(`[BharatPe] Auth failed (${response.status}) — credentials expired`);
-            const result: BPTransaction[] & { authFailed?: boolean } = [];
-            result.authFailed = true;
-            return result;
-          }
-
-          if (response.status === 200 && response.data) {
-            // allHistory returns { success: true, data: { transactions: [...], ... } }
-            // Old endpoints return { data: [...] } or { transactions: [...] }
-            const raw = response.data;
-            let transactions: BPTransaction[] = [];
-
-            if (raw.data?.transactions && Array.isArray(raw.data.transactions)) {
-              transactions = raw.data.transactions;
-            } else if (raw.data?.data && Array.isArray(raw.data.data)) {
-              transactions = raw.data.data;
-            } else if (Array.isArray(raw.data)) {
-              transactions = raw.data;
-            } else if (Array.isArray(raw.transactions)) {
-              transactions = raw.transactions;
-            } else if (raw.success && raw.data && typeof raw.data === 'object') {
-              // allHistory may have nested structure — look for any array
-              for (const key of Object.keys(raw.data)) {
-                if (Array.isArray(raw.data[key]) && raw.data[key].length > 0) {
-                  transactions = raw.data[key];
-                  break;
-                }
-              }
-            }
-
-            console.log(`[BharatPe] ${url.split('?')[0].split('/').pop()}: found ${transactions.length} transactions`);
-
-            if (!Array.isArray(transactions) || transactions.length === 0) continue;
-
-            if (amount) {
-              const cutoff = new Date(Date.now() - timeRange * 60 * 1000);
-              return transactions.filter((txn) => {
-                const txnAmount = parseFloat(String(txn.amount || txn.txn_amount || '0'));
-                const txnDate = new Date(String(txn.created_at || txn.date || txn.createdAt || txn.transaction_date || ''));
-                return txnAmount === parseFloat(String(amount)) && txnDate > cutoff;
-              });
-            }
-            return transactions;
-          }
-        } catch (err) {
-          console.log(`[BharatPe] Error on ${url.split('?')[0].split('/').pop()}:`, (err as Error).message);
-        }
+      if (!token) {
+        console.log('[BharatPe] No token available — cannot check transactions');
+        const result: BPTransaction[] & { authFailed?: boolean } = [];
+        result.authFailed = true;
+        return result;
       }
 
+      // Use epoch milliseconds for date range
+      const now = Date.now();
+      const sDate = now - (timeRange * 60 * 1000); // timeRange minutes ago
+      const eDate = now;
+
+      const url = `https://payments-tesseract.bharatpe.in/api/v1/merchant/transactions?module=PAYMENT_QR&merchantId=${merchantId}&sDate=${sDate}&eDate=${eDate}&pageSize=20&pageCount=0&isFromOtDashboard=1`;
+
+      const response = await axios.get(url, {
+        headers: {
+          'token': token,
+          'Accept': 'application/json',
+          'Origin': 'https://enterprise.bharatpe.in',
+          'Referer': 'https://enterprise.bharatpe.in/',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+        },
+        timeout: 10000,
+        validateStatus: () => true,
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        console.log(`[BharatPe] Auth failed (${response.status}) — token expired`);
+        const result: BPTransaction[] & { authFailed?: boolean } = [];
+        result.authFailed = true;
+        return result;
+      }
+
+      if (response.status === 200 && response.data?.status === true) {
+        const rawTxns = response.data.data?.transactions || [];
+        console.log(`[BharatPe] Tesseract API: found ${rawTxns.length} transactions`);
+
+        // Map Tesseract format to our BPTransaction format
+        const transactions: BPTransaction[] = rawTxns.map((txn: Record<string, unknown>) => ({
+          amount: String(txn.amount || '0'),
+          bankReferenceNo: txn.bankReferenceNo as string,
+          utr: txn.bankReferenceNo as string,
+          created_at: txn.paymentTimestamp ? new Date(txn.paymentTimestamp as number).toISOString() : '',
+          payerName: txn.payerName as string,
+          status: txn.status as string,
+          type: txn.type as string,
+        }));
+
+        if (amount) {
+          return transactions.filter((txn) => {
+            const txnAmount = parseFloat(String(txn.amount || '0'));
+            return txnAmount === parseFloat(String(amount)) && txn.status === 'SUCCESS';
+          });
+        }
+        return transactions;
+      }
+
+      console.log(`[BharatPe] Tesseract API: status=${response.status}, message=${response.data?.message || 'unknown'}`);
       return [];
     } catch (error: unknown) {
       const err = error as Error;
